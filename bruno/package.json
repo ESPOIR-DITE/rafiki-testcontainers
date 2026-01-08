@@ -1,0 +1,7 @@
+{
+  "name": "rafiki-open-payments-bruno",
+  "version": "1.0.0",
+  "dependencies": {
+    "json-canonicalize": "^1.0.6"
+  }
+}

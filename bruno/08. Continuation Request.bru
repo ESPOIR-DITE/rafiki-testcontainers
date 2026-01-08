@@ -1,0 +1,47 @@
+meta {
+  name: Continuation Request
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{senderOpenPaymentsContinuationUri}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: GNAP {{continueToken}}
+}
+
+script:pre-request {
+  const scripts = require('./scripts');
+
+  await scripts.addSignatureHeaders();
+}
+
+script:post-response {
+  const scripts = require('./scripts');
+
+  scripts.storeTokenDetails();
+
+  const body = res.getBody();
+
+  // Check if we got an access token or just a continue response
+  if (body?.access_token) {
+    console.log("SUCCESS: Got access token for outgoing-payment grant!")
+  } else if (body?.continue) {
+    console.log("=".repeat(60))
+    console.log("WARNING: Grant is still pending approval!")
+    console.log("The grant has NOT been approved yet.")
+    console.log("Please approve the grant at the redirect URL from request 7,")
+    console.log("then run this request again.")
+    console.log("=".repeat(60))
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

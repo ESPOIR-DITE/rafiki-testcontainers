@@ -1,0 +1,116 @@
+const { createHmac } = require('crypto')
+const { canonicalize } = require('json-canonicalize')
+const fetch = require('node-fetch')
+const url = require('url')
+
+const scripts = {
+  resolveTemplateVariables: function (string) {
+    const VARIABLE_NAME_REGEX = /{{([A-Za-z]\w+)}}/g
+
+    return string.replace(
+      VARIABLE_NAME_REGEX,
+      (_, key) => bru.getVar(key) || bru.getEnvVar(key)
+    )
+  },
+
+  sanitizeUrl: function () {
+    return this.resolveTemplateVariables(req.getUrl()).replace(
+      /localhost:([3,4])000/g,
+      (_, key) =>
+        key === '3' ? bru.getEnvVar('host3000') : bru.getEnvVar('host4000')
+    )
+  },
+
+  sanitizeBody: function () {
+    let requestBody = req.getBody()
+    if (!(req.getMethod() === 'POST' && requestBody)) return undefined
+    if (typeof requestBody === 'object') {
+      requestBody = JSON.stringify(requestBody)
+    }
+    return JSON.parse(
+      this.resolveTemplateVariables(requestBody).replace(
+        /http:\/\/localhost:([3,4])000/g,
+        (_, key) =>
+          key === '3'
+            ? 'https://' + bru.getEnvVar('host3000')
+            : 'https://' + bru.getEnvVar('host4000')
+      )
+    )
+  },
+
+  sanitizeHeaders: function () {
+    return JSON.parse(
+      this.resolveTemplateVariables(JSON.stringify(req.getHeaders()))
+    )
+  },
+
+  requestSigHeaders: async function (url, method, headers, body) {
+    const response = await fetch(bru.getEnvVar('signatureUrl'), {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keyId: bru.getEnvVar('clientKeyId'),
+        base64Key: bru.getEnvVar('clientPrivateKey'),
+        request: {
+          url,
+          method,
+          headers,
+          body: JSON.stringify(body)
+        }
+      })
+    })
+    return await response.json()
+  },
+
+  setHeaders: function (headers) {
+    for (let [key, value] of Object.entries(headers)) {
+      req.setHeader(key, value)
+    }
+  },
+
+  addSignatureHeaders: async function () {
+    const url = this.sanitizeUrl()
+    const headers = this.sanitizeHeaders()
+    const body = this.sanitizeBody()
+    req.setBody(body)
+    const signatureHeaders = await this.requestSigHeaders(
+      url,
+      req.getMethod(),
+      headers,
+      body
+    )
+    this.setHeaders(signatureHeaders)
+  },
+
+  addHostHeader: function (hostVarName) {
+    const requestUrl = url.parse(this.resolveTemplateVariables(req.getUrl()))
+
+    if (hostVarName) {
+      bru.setEnvVar(hostVarName, requestUrl.protocol + '//' + requestUrl.host)
+    }
+
+    if (requestUrl.hostname === 'localhost') {
+      const hostHeader =
+        requestUrl.port === '3000'
+          ? bru.getEnvVar('host3000')
+          : bru.getEnvVar('host4000')
+      req.headers.host = hostHeader
+    }
+  },
+
+  storeTokenDetails: function () {
+    const body = res.getBody()
+
+    if (body?.access_token) {
+      bru.setEnvVar('accessToken', body.access_token.value)
+      bru.setEnvVar('tokenId', body.access_token.manage.split('/').pop())
+    }
+
+    if (body?.continue) {
+      bru.setEnvVar('continueToken', body.continue.access_token.value)
+      bru.setEnvVar('continueId', body.continue.uri.split('/').pop())
+    }
+  }
+}
+
+module.exports = scripts

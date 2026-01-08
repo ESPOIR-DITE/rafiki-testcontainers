@@ -4,50 +4,60 @@ import org.testcontainers.containers.ComposeContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.io.File;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Objects;
+import java.net.URL;
 
 /**
  * Testcontainers wrapper for Rafiki - the open-source Interledger service.
  * <p>
  * This class manages a Docker Compose stack containing:
  * <ul>
- *   <li>Rafiki Backend (Open Payments, Admin API, ILP Connector)</li>
- *   <li>PostgreSQL database</li>
- *   <li>Redis cache</li>
- *   <li>TigerBeetle accounting database</li>
+ * <li>Rafiki Backend (Open Payments, Admin API, ILP Connector)</li>
+ * <li>PostgreSQL database</li>
+ * <li>Redis cache</li>
+ * <li>TigerBeetle accounting database</li>
  * </ul>
  * <p>
- * Note: Authentication and Frontend services are not included in this testcontainer
- * configuration for simplicity. They require additional Kratos identity server setup.
+ * Note: Authentication and Frontend services are not included in this
+ * testcontainer
+ * configuration for simplicity. They require additional Kratos identity server
+ * setup.
  *
  * <h2>Example Usage:</h2>
- * <pre>{@code
- * @TestInstance(TestInstance.Lifecycle.PER_CLASS)
- * public class MyIntegrationTest {
- *     private RafikiCompose rafiki;
+ * 
+ * <pre>
+ * {
+ *     &#64;code
+ *     &#64;TestInstance(TestInstance.Lifecycle.PER_CLASS)
+ *     public class MyIntegrationTest {
+ *         private RafikiCompose rafiki;
  *
- *     @BeforeAll
- *     void setup() {
- *         rafiki = new RafikiCompose();
- *         rafiki.start();
- *     }
+ *         &#64;BeforeAll
+ *         void setup() {
+ *             rafiki = new RafikiCompose();
+ *             rafiki.start();
+ *         }
  *
- *     @AfterAll
- *     void teardown() {
- *         rafiki.stop();
- *     }
+ *         &#64;AfterAll
+ *         void teardown() {
+ *             rafiki.stop();
+ *         }
  *
- *     @Test
- *     void testBackend() {
- *         String adminUrl = rafiki.backendAdminUrl();
- *         // Make HTTP requests to test Rafiki
+ *         @Test
+ *         void testBackend() {
+ *             String adminUrl = rafiki.backendAdminUrl();
+ *             // Make HTTP requests to test Rafiki
+ *         }
  *     }
  * }
- * }</pre>
+ * </pre>
  *
  * @see <a href="https://rafiki.dev">Rafiki Documentation</a>
- * @see <a href="https://github.com/hashcode-zm/rafiki-testcontainers">GitHub Repository</a>
+ * @see <a href="https://github.com/hashcode-zm/rafiki-testcontainers">GitHub
+ *      Repository</a>
  * @since 0.1.0
  */
 public class RafikiCompose implements AutoCloseable {
@@ -60,30 +70,48 @@ public class RafikiCompose implements AutoCloseable {
      * The containers are not started until {@link #start()} is called.
      * All services are configured to wait up to 3 minutes for startup.
      */
+    @SuppressWarnings("resource")
     public RafikiCompose() {
         // Use classpath resource directly
-        this.compose = new ComposeContainer(
-                new File(Objects.requireNonNull(
-                        getClass().getClassLoader().getResource("rafiki/docker-compose.yml"),
-                        "docker-compose.yml not found in classpath"
-                ).getFile())
-        )
+        URL resource = Objects.requireNonNull(
+                getClass().getClassLoader().getResource("docker-compose.yml"),
+                "docker-compose.yml not found in classpath");
+        File composeFile;
+        try {
+            composeFile = Paths.get(resource.toURI()).toFile();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException("Failed to load docker-compose.yml from classpath", e);
+        }
+        this.compose = new ComposeContainer(composeFile)
                 .withLocalCompose(true)
-                .withExposedService("rafiki-backend-1", 3000,
-                    Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
-                .withExposedService("rafiki-backend-1", 3001,
-                    Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
-                .withExposedService("rafiki-backend-1", 3002,
-                    Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)));
+                .withExposedService("cloud-nine-auth-1", 3003,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("cloud-nine-admin-1", 3010,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("cloud-nine-backend-1", 3000,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("cloud-nine-mock-ase-1", 3030,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("happy-life-backend-1", 4000,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("happy-life-auth-1", 4003,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("happy-life-admin-1", 4010,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                .withExposedService("happy-life-mock-ase-1", 3031,
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)));
+
     }
 
     /**
      * Starts all Rafiki containers and waits for them to be ready.
      * <p>
      * This method blocks until all backend services are listening on their ports
-     * (up to 3 minutes per service). On first run, Docker images will be downloaded.
+     * (up to 3 minutes per service). On first run, Docker images will be
+     * downloaded.
      *
-     * @throws org.testcontainers.containers.ContainerLaunchException if containers fail to start
+     * @throws org.testcontainers.containers.ContainerLaunchException if containers
+     *                                                                fail to start
      */
     public void start() {
         compose.start();
@@ -92,81 +120,88 @@ public class RafikiCompose implements AutoCloseable {
     /**
      * Stops and removes all Rafiki containers.
      * <p>
-     * This method cleans up all containers, networks, and volumes created by this instance.
+     * This method cleans up all containers, networks, and volumes created by this
+     * instance.
      */
     public void stop() {
         compose.stop();
     }
 
     /**
-     * Returns the URL for the Rafiki Backend Open Payments API endpoint.
+     * Returns the URL for the Cloud Nine Admin API endpoint.
      * <p>
-     * This endpoint handles Open Payments protocol operations (wallet addresses, quotes, payments).
+     * This endpoint provides administrative operations for the Cloud Nine service.
      *
-     * @return the Open Payments API URL (e.g., "http://localhost:51234")
-     * @see <a href="https://openpayments.guide">Open Payments Specification</a>
+     * @return the Admin API URL (e.g., "http://localhost:4010")
      */
-    public String backendOpenPaymentsUrl() {
-        return getServiceUrl("rafiki-backend-1", 3000);
+    public String cloudNineAdminUrl() {
+        return getServiceUrl("cloud-nine-admin-1", 3010);
     }
 
     /**
-     * Returns the URL for the Rafiki Backend Admin API endpoint.
+     * Returns the URL for the Happy Life Backend API endpoint.
      * <p>
-     * This GraphQL endpoint provides administrative operations for managing
-     * wallet addresses, peers, and viewing account balances.
+     * This endpoint handles backend operations for the Happy Life service.
      *
-     * @return the Admin API URL (e.g., "http://localhost:51235")
+     * @return the Backend API URL (e.g., "http://localhost:4001")
      */
-    public String backendAdminUrl() {
-        return getServiceUrl("rafiki-backend-1", 3001);
+    public String happyLifeBackendUrl() {
+        return getServiceUrl("happy-life-backend-1", 4001);
     }
 
     /**
-     * Returns the URL for the Rafiki Backend ILP Connector endpoint.
+     * Returns the URL for the Happy Life Auth API endpoint.
      * <p>
-     * This endpoint handles Interledger Protocol (ILP) packet routing.
+     * This endpoint handles authentication operations for the Happy Life service.
      *
-     * @return the ILP Connector URL (e.g., "http://localhost:51236")
-     * @see <a href="https://interledger.org">Interledger Protocol</a>
+     * @return the Auth API URL (e.g., "http://localhost:4003")
      */
-    public String backendConnectorUrl() {
-        return getServiceUrl("rafiki-backend-1", 3002);
+    public String happyLifeAuthUrl() {
+        return getServiceUrl("happy-life-auth-1", 4003);
     }
 
     /**
-     * Returns the URL for the Rafiki Auth Server endpoint.
+     * Returns the URL for the Cloud Nine Backend API endpoint.
      * <p>
-     * <strong>Note:</strong> The auth service is not included in this testcontainer.
-     * This method is provided for API compatibility but will return a placeholder URL.
+     * This endpoint handles backend operations for the Cloud Nine service.
      *
-     * @return a placeholder URL (service not running in testcontainer)
-     * @deprecated Auth service not included in testcontainer configuration
+     * @return the Backend API URL (e.g., "http://localhost:4000")
      */
-    @Deprecated
-    public String authServerUrl() {
-        return getServiceUrl("rafiki-auth-1", 3006);
+    public String cloudNineBackendUrl() {
+        return getServiceUrl("cloud-nine-backend-1", 4000);
     }
 
     /**
-     * Returns the URL for the Rafiki Frontend admin interface.
+     * Returns the URL for the Cloud Nine Mock ASE endpoint.
      * <p>
-     * <strong>Note:</strong> The frontend service is not included in this testcontainer.
-     * This method is provided for API compatibility but will return a placeholder URL.
+     * This endpoint provides a mock ASE (Application Service Environment) for
+     * testing.
      *
-     * @return a placeholder URL (service not running in testcontainer)
-     * @deprecated Frontend service not included in testcontainer configuration
+     * @return the Mock ASE URL (e.g., "http://localhost:3030")
      */
-    @Deprecated
-    public String frontendUrl() {
-        return getServiceUrl("rafiki-frontend-1", 3005);
+    public String cloudNineMockAseUrl() {
+        return getServiceUrl("cloud-nine-mock-ase-1", 3030);
+    }
+
+    /**
+     * Returns the URL for the Cloud Nine Auth API endpoint.
+     * <p>
+     * This endpoint handles authentication operations for the Cloud Nine service.
+     *
+     * @return the Auth API URL (e.g., "http://localhost:3002")
+     */
+    public String cloudNineAuthUrl() {
+        return getServiceUrl("cloud-nine-auth-1", 3002);
     }
 
     private String getServiceUrl(String serviceName, int port) {
         try {
-            int mappedPort = compose.getServicePort(serviceName, port);
+            Integer mappedPort = compose.getServicePort(serviceName, port);
+            if (mappedPort == null) {
+                return "http://localhost:" + port + " (not started)";
+            }
             return "http://localhost:" + mappedPort;
-        } catch (IllegalStateException e) {
+        } catch (IllegalStateException | NullPointerException e) {
             return "http://localhost:" + port + " (not started)";
         }
     }

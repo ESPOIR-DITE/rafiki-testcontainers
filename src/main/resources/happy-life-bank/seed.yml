@@ -1,0 +1,58 @@
+assets:
+  - code: USD
+    scale: 2
+    liquidity: 10000000000
+    liquidityThreshold: 100000000
+  - code: EUR
+    scale: 2
+    liquidity: 10000000000
+    liquidityThreshold: 1000000
+peeringAsset: 'USD'
+peers:
+  - initialLiquidity: '1000000000000'
+    peerUrl: http://cloud-nine-wallet-backend:3002
+    peerIlpAddress: test.cloud-nine-wallet
+    liquidityThreshold: 1000000
+    tokens:
+      incoming:
+        - test-USD-cloud-nine-wallet-happy-life-bank
+      outgoing: test-USD-happy-life-bank-cloud-nine-wallet
+accounts:
+  - name: 'Philip Fry'
+    path: accounts/pfry
+    id: 97a3a431-8ee1-48fc-ac85-70e2f5eba8e5
+    initialBalance: 1
+    brunoEnvVar: pfryWalletAddress
+    assetCode: USD
+  - name: 'PlanEx Corp'
+    id: a455cc54-b583-455b-836a-e5275c5c05b7
+    initialBalance: 2000000
+    path: accounts/planex
+    brunoEnvVar: planexWalletAddress
+    assetCode: USD
+  - name: 'Alice Smith'
+    path: accounts/asmith
+    id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+    initialBalance: 5000000
+    brunoEnvVar: asmithWalletAddress
+    assetCode: USD
+  - name: 'Lars'
+    path: accounts/lars
+    id: fd4ecbc9-205d-4ecd-a030-507d6ce2bde6
+    initialBalance: 50000000
+    brunoEnvVar: larsWalletAddress
+    assetCode: EUR
+rates:
+  EUR:
+    USD: 1.10
+  USD:
+    EUR: 0.91
+fees:
+  - fixed: 100
+    basisPoints: 200
+    asset: USD
+    scale: 2
+  - fixed: 100
+    basisPoints: 200
+    asset: EUR
+    scale: 2
