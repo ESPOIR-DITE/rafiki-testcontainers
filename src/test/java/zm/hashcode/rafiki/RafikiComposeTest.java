@@ -1,14 +1,15 @@
 package zm.hashcode.rafiki;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
+import static org.awaitility.Awaitility.await;
 import org.junit.jupiter.api.AfterAll;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test for RafikiCompose.
@@ -38,18 +39,18 @@ public class RafikiComposeTest {
     @Test
     void backendContainersStartAndPortsAreAccessible() throws Exception {
 
-        String adminUrl = env.backendAdminUrl();
+        String adminUrl = env.cloudNineAdminUrl();
         System.out.println("Testing Backend Admin URL: " + adminUrl);
         assertTrue(adminUrl.contains("localhost"), "Admin URL should contain localhost");
         assertTrue(adminUrl.contains(":"), "Admin URL should contain port");
 
 
-        String openPaymentsUrl = env.backendOpenPaymentsUrl();
+        String openPaymentsUrl = env.happyLifeBackendUrl();
         System.out.println("Testing Backend Open Payments URL: " + openPaymentsUrl);
         assertTrue(openPaymentsUrl.contains("localhost"), "Open Payments URL should contain localhost");
 
 
-        String connectorUrl = env.backendConnectorUrl();
+        String connectorUrl = env.cloudNineMockAseUrl();
         System.out.println("Testing Backend Connector URL: " + connectorUrl);
         assertTrue(connectorUrl.contains("localhost"), "Connector URL should contain localhost");
 
@@ -59,13 +60,31 @@ public class RafikiComposeTest {
 
     @Test
     void backendAdminPortResponds() throws Exception {
-
-        Thread.sleep(5000);
-
-        String adminUrl = env.backendAdminUrl();
+        String adminUrl = env.cloudNineAdminUrl();
         System.out.println("Making HTTP request to: " + adminUrl);
 
         URL url = new URL(adminUrl);
+
+        // Wait for the service to be ready using Awaitility
+        await()
+                .atMost(30, SECONDS)
+                .pollInterval(2, SECONDS)
+                .until(() -> {
+                    try {
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setConnectTimeout(5_000);
+                        conn.setReadTimeout(5_000);
+                        conn.setRequestMethod("GET");
+                        conn.connect();
+                        int responseCode = conn.getResponseCode();
+                        conn.disconnect();
+                        return responseCode < 500;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                });
+
+        // Verify the final response
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setConnectTimeout(15_000);
         conn.setReadTimeout(15_000);

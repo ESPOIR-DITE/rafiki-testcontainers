@@ -1,14 +1,14 @@
 package zm.hashcode.rafiki;
 
-import org.testcontainers.containers.ComposeContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-
 import java.io.File;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Objects;
-import java.net.URL;
+
+import org.testcontainers.containers.ComposeContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 
 /**
  * Testcontainers wrapper for Rafiki - the open-source Interledger service.
@@ -68,13 +68,13 @@ public class RafikiCompose implements AutoCloseable {
      * Creates a new Rafiki testcontainer instance.
      * <p>
      * The containers are not started until {@link #start()} is called.
-     * All services are configured to wait up to 3 minutes for startup.
+     * All services are configured to wait up to 2 minutes for startup.
      */
     @SuppressWarnings("resource")
     public RafikiCompose() {
         // Use classpath resource directly
         URL resource = Objects.requireNonNull(
-                getClass().getClassLoader().getResource("docker-compose.yml"),
+                getClass().getClassLoader().getResource("rafiki-local-containers/docker-compose.yml"),
                 "docker-compose.yml not found in classpath");
         File composeFile;
         try {
@@ -83,32 +83,38 @@ public class RafikiCompose implements AutoCloseable {
             throw new RuntimeException("Failed to load docker-compose.yml from classpath", e);
         }
         this.compose = new ComposeContainer(composeFile)
-                .withLocalCompose(true)
                 .withExposedService("cloud-nine-auth-1", 3003,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("cloud-nine-admin-1", 3010,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("cloud-nine-backend-1", 3000,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("cloud-nine-mock-ase-1", 3030,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("happy-life-backend-1", 4000,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("happy-life-auth-1", 4003,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("happy-life-admin-1", 4010,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)))
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)))
                 .withExposedService("happy-life-mock-ase-1", 3031,
-                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)));
+                        Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)));
 
     }
 
     /**
      * Starts all Rafiki containers and waits for them to be ready.
      * <p>
-     * This method blocks until all backend services are listening on their ports
-     * (up to 3 minutes per service). On first run, Docker images will be
-     * downloaded.
+     * This method initializes and starts the Docker Compose stack containing:
+     * <ul>
+     * <li>Cloud Nine Wallet services (backend, auth, admin, mock ASE)</li>
+     * <li>Happy Life Bank services (backend, auth, admin, mock ASE)</li>
+     * <li>Shared infrastructure (PostgreSQL database, Redis cache)</li>
+     * </ul>
+     * <p>
+     * The method blocks until all exposed services are listening on their ports
+     * (up to 2 minutes per service). On first run, Docker images will be
+     * downloaded, which may take several minutes.
      *
      * @throws org.testcontainers.containers.ContainerLaunchException if containers
      *                                                                fail to start
@@ -120,39 +126,92 @@ public class RafikiCompose implements AutoCloseable {
     /**
      * Stops and removes all Rafiki containers.
      * <p>
-     * This method cleans up all containers, networks, and volumes created by this
-     * instance.
+     * This method gracefully stops all containers in the Docker Compose stack
+     * and cleans up associated resources. Containers, networks, and volumes
+     * created by this instance are removed.
+     * <p>
+     * Note: Data volumes are preserved by default. To completely remove volumes,
+     * use Docker Compose commands directly.
      */
     public void stop() {
         compose.stop();
     }
 
+    // ============================================
+    // Cloud Nine Wallet Service Getters
+    // ============================================
+
     /**
-     * Returns the URL for the Cloud Nine Admin API endpoint.
+     * Returns the URL for the Cloud Nine Backend API endpoint.
      * <p>
-     * This endpoint provides administrative operations for the Cloud Nine service.
+     * This endpoint provides the Open Payments API (port 80) for the Cloud Nine Wallet.
+     * The backend also exposes Admin API on port 3001 and ILP Connector on port 3002.
      *
-     * @return the Admin API URL (e.g., "http://localhost:4010")
+     * @return the Backend Open Payments API URL (e.g., "http://localhost:3000")
+     */
+    public String cloudNineBackendUrl() {
+        return getServiceUrl("cloud-nine-backend-1", 3000);
+    }
+
+    /**
+     * Returns the URL for the Cloud Nine Auth API endpoint.
+     * <p>
+     * This endpoint provides GNAP (Grant Negotiation and Authorization Protocol) 
+     * authorization services for the Cloud Nine Wallet. The auth service also exposes
+     * ports 3006 (grant endpoint), 3009, and 3011 (service API).
+     *
+     * @return the Auth API URL (e.g., "http://localhost:3003")
+     */
+    public String cloudNineAuthUrl() {
+        return getServiceUrl("cloud-nine-auth-1", 3003);
+    }
+
+    /**
+     * Returns the URL for the Cloud Nine Admin UI endpoint.
+     * <p>
+     * This endpoint provides a web-based administrative interface for managing
+     * the Cloud Nine Wallet Rafiki instance.
+     *
+     * @return the Admin UI URL (e.g., "http://localhost:3010")
      */
     public String cloudNineAdminUrl() {
         return getServiceUrl("cloud-nine-admin-1", 3010);
     }
 
     /**
+     * Returns the URL for the Cloud Nine Mock ASE endpoint.
+     * <p>
+     * This endpoint provides a mock Account Servicing Entity (ASE) interface
+     * for testing user-facing wallet operations with the Cloud Nine Wallet.
+     *
+     * @return the Mock ASE URL (e.g., "http://localhost:3030")
+     */
+    public String cloudNineMockAseUrl() {
+        return getServiceUrl("cloud-nine-mock-ase-1", 3030);
+    }
+
+    // ============================================
+    // Happy Life Bank Service Getters
+    // ============================================
+
+    /**
      * Returns the URL for the Happy Life Backend API endpoint.
      * <p>
-     * This endpoint handles backend operations for the Happy Life service.
+     * This endpoint provides the Open Payments API (port 80) for the Happy Life Bank.
+     * The backend also exposes Admin API on port 3001 and ILP Connector on port 3002.
      *
-     * @return the Backend API URL (e.g., "http://localhost:4001")
+     * @return the Backend Open Payments API URL (e.g., "http://localhost:4000")
      */
     public String happyLifeBackendUrl() {
-        return getServiceUrl("happy-life-backend-1", 4001);
+        return getServiceUrl("happy-life-backend-1", 4000);
     }
 
     /**
      * Returns the URL for the Happy Life Auth API endpoint.
      * <p>
-     * This endpoint handles authentication operations for the Happy Life service.
+     * This endpoint provides GNAP (Grant Negotiation and Authorization Protocol)
+     * authorization services for the Happy Life Bank. The auth service also exposes
+     * ports 4006 (grant endpoint), 4009, and 4011 (service API).
      *
      * @return the Auth API URL (e.g., "http://localhost:4003")
      */
@@ -161,39 +220,40 @@ public class RafikiCompose implements AutoCloseable {
     }
 
     /**
-     * Returns the URL for the Cloud Nine Backend API endpoint.
+     * Returns the URL for the Happy Life Admin UI endpoint.
      * <p>
-     * This endpoint handles backend operations for the Cloud Nine service.
+     * This endpoint provides a web-based administrative interface for managing
+     * the Happy Life Bank Rafiki instance.
      *
-     * @return the Backend API URL (e.g., "http://localhost:4000")
+     * @return the Admin UI URL (e.g., "http://localhost:4010")
      */
-    public String cloudNineBackendUrl() {
-        return getServiceUrl("cloud-nine-backend-1", 4000);
+    public String happyLifeAdminUrl() {
+        return getServiceUrl("happy-life-admin-1", 4010);
     }
 
     /**
-     * Returns the URL for the Cloud Nine Mock ASE endpoint.
+     * Returns the URL for the Happy Life Mock ASE endpoint.
      * <p>
-     * This endpoint provides a mock ASE (Application Service Environment) for
-     * testing.
+     * This endpoint provides a mock Account Servicing Entity (ASE) interface
+     * for testing user-facing bank operations with the Happy Life Bank.
      *
-     * @return the Mock ASE URL (e.g., "http://localhost:3030")
+     * @return the Mock ASE URL (e.g., "http://localhost:3031")
      */
-    public String cloudNineMockAseUrl() {
-        return getServiceUrl("cloud-nine-mock-ase-1", 3030);
+    public String happyLifeMockAseUrl() {
+        return getServiceUrl("happy-life-mock-ase-1", 3031);
     }
 
     /**
-     * Returns the URL for the Cloud Nine Auth API endpoint.
+     * Helper method to get the URL for a service by name and internal port.
      * <p>
-     * This endpoint handles authentication operations for the Cloud Nine service.
+     * Retrieves the mapped host port for a service and constructs a URL.
+     * If the service is not started or the port cannot be determined,
+     * returns a placeholder URL indicating the service is not available.
      *
-     * @return the Auth API URL (e.g., "http://localhost:3002")
+     * @param serviceName the Docker Compose service name
+     * @param port the internal container port
+     * @return the service URL with mapped host port, or a placeholder if unavailable
      */
-    public String cloudNineAuthUrl() {
-        return getServiceUrl("cloud-nine-auth-1", 3002);
-    }
-
     private String getServiceUrl(String serviceName, int port) {
         try {
             Integer mappedPort = compose.getServicePort(serviceName, port);

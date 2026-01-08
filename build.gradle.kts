@@ -27,10 +27,11 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
-    implementation(platform("org.testcontainers:testcontainers-bom:1.20.3"))
+    implementation(platform("org.testcontainers:testcontainers-bom:2.0.3"))
     implementation("org.testcontainers:testcontainers")
 
     testImplementation("org.slf4j:slf4j-simple:2.0.9")
+    testImplementation("org.awaitility:awaitility:4.2.0")
 
     implementation("org.apache.commons:commons-compress:1.26.0")
     implementation("commons-codec:commons-codec:1.16.0")

@@ -1,4 +1,5 @@
 name: rafiki-standalone
+version: '3.8'
 
 services:
   # Mock Account Servicing Entity (ASE) - User-facing interface

@@ -1,9 +1,8 @@
 package zm.hashcode.rafiki;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 public class RafikiComposeSimpleTest {
 
@@ -13,15 +12,15 @@ public class RafikiComposeSimpleTest {
         assertNotNull(compose, "RafikiCompose should be instantiated");
 
 
-        String adminUrl = compose.backendAdminUrl();
+        String adminUrl = compose.cloudNineAdminUrl();
         assertNotNull(adminUrl);
         assertTrue(adminUrl.contains("not started") || adminUrl.contains("localhost"));
 
-        String openPaymentsUrl = compose.backendOpenPaymentsUrl();
+        String openPaymentsUrl = compose.happyLifeBackendUrl();
         assertNotNull(openPaymentsUrl);
         assertTrue(openPaymentsUrl.contains("not started") || openPaymentsUrl.contains("localhost"));
 
-        String connectorUrl = compose.backendConnectorUrl();
+        String connectorUrl = compose.cloudNineMockAseUrl();
         assertNotNull(connectorUrl);
         assertTrue(connectorUrl.contains("not started") || connectorUrl.contains("localhost"));
 
